@@ -1,0 +1,10 @@
+{
+    "C_Cpp.formatting": "Disabled",
+    "liveshare.allowGuestDebugControl": true,
+    "files.associations": {
+        "complex": "c",
+        "interrupt.h": "c",
+        "file.h": "c",
+        "filesys.h": "c"
+    }
+}

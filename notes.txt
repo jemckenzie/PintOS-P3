@@ -1,0 +1,67 @@
+==============================
+    CIS 520 S21 - Project 2
+	   ---
+==============================
+
+==== Observations ====
+
+Illegal memory accesses:
+	-How do we release memory and pages after crashing the process??
+
+-Buffer user memory
+	- We should probably verify if the whole length of the given buffers are valid.
+
+==== Modified files ====
+
+*-process.c:
+
+	-Modified setup_stack()
+	-implementing passing arguments
+	-modified load() to acomodate args
+	-added argument passing in setup_stack(). Functionality probably won't look but good layout
+	-I changed three return TID_ERROR to PID_ERROR
+	- process_exit()
+
+*-process.h:
+	
+	-Added arguments struct
+	-function prototypes
+	-SEMA_LOAD increases if process loads correctly
+
+*-syscall.c:
+	-validate pointer function
+	-get_word function
+	-added file lock
+	-functional syscall handler
+	-sys_halt function
+	-sys_open
+	-sys_close
+	-sys_filesize
+	-sys_exit (incomplete) 
+	-sys_exec (SEMA_LOAD CHECK)
+	-sys_tell completed
+
+*-syscall.h:	
+	-added function prototypes
+
+*-thread.c
+	-initialized new properties
+	-added code required for sys_exec (semaphores and loading)
+	-added list initializers to init_thread (to account for the main thread).
+
+*-thread.h
+	-added children list property	(NOT WORKING!!!!!!!!!!!!!!!)
+	-added open_files list property
+	-added parent thread property
+	-added fd_list list property to represent file descriptors of thread
+	-added current_fd property to represent current fd(may not need)?
+
+*-file.h
+	-added new open_file_elem struct (to handle files open by a process).
+
+*-exception.c
+	-changed line 93 to sys_exit(-1) to be closed as a user program not a kernel
+	-added #include "userprog/syscall.h"
+
+==== Removed code: ====
+
