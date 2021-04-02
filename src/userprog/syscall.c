@@ -30,6 +30,10 @@ static int sys_close (int handle);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
+
+// //For Vitual Memory
+// static mapid_t sys_mmap(int fd, void *addr);
+// static void sys_munmap(mapid_t mapping);
  
 /* Serializes file system operations. */
 static struct lock fs_lock;
@@ -470,3 +474,20 @@ syscall_exit (void)
   }
   return;
 }
+
+// /*Maps the file open as fd into the process's virtual address space. The entire file is mapped into consecutive virtual pages starting at addr.
+//   More info in assignment*/
+// static mapid_t
+// sys_mmap(int fd, void *addr)
+// {
+
+// }
+
+// /*Unmaps the mapping designated by mapping, which must be a mapping ID
+//  returned by a previous call to mmap by the same process that has not yet been unmapped.
+//  More infor in assignment*/
+// static void
+// sys_munmap(mapid_t mapping)
+// {
+
+// }

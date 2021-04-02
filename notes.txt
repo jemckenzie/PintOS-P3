@@ -65,3 +65,19 @@ Illegal memory accesses:
 
 ==== Removed code: ====
 
+
+==============================
+    CIS 520 S21 - Project 3
+	   ---
+==============================
+
+==== Modified files ====
+
+*-syscall.c
+	-Added skeleton for mmap and munmap, recommended implementation of this is after frame and page stuff
+
+*-page.c
+	-started the skeleton of this file
+
+*-page.h
+	-started adding stuff, did not complete the frame struct yet.
