@@ -10,6 +10,7 @@
 struct frame
 {
     void *page; //Pointer to page. Every entry in frame table points to the page ("kernel page maps to frame", is what HangPark says)
+    struct list_elem elem;      /* Structured as a list */
 };
 
 void ftable_init(void); //initialization of the frame table 
