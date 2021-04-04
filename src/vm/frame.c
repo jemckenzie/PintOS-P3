@@ -85,3 +85,28 @@ void frame_free(struct frame *f)
     lock_release(&ftable_lock);
 }
 
+/* Removes a frame but does not free from memory, may be useful later for swapping. */
+void frame_remove(struct frame *f)
+{
+    struct list_elem *e;
+    struct frame *frame;
+    //Critical section
+    lock_acquire(&ftable_lock);
+    //Find the given frame.
+    for(e = list_begin(&ftable); e != list_end(&ftable); e = list_next(e))
+    {
+        frame = list_entry(e, struct frame, elem);
+        if(frame->page == f->page)
+        {
+            f = frame;
+            break;
+        }
+    }
+    //If we find the given frame in the frame table, remove it from the list and free the STRUCT but not the PAGE.
+    if(f != NULL)
+    {
+        list_remove(&f->elem);
+        free(f);
+    }
+    lock_release(&ftable_lock);
+}
