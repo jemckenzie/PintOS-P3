@@ -499,24 +499,20 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+      /// PROJECT 3 ///
+
       /* Get a page of memory. */
-      #ifdef VM
-      //Allocate a frame if VM.
-      uint8_t *kpage = frame_allocate(PAL_USER);
-      #else
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      #endif
+      uint8_t *kpage = frame_allocate(PAL_USER)
+
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          #ifdef VM
+
+          /// PROJECT 3 ///
           frame_free (kpage);
-          #else
-          palloc_free_page (kpage);
-          #endif
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -524,11 +520,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          #ifdef VM
+
+          /// PROJECT 3 ///
           frame_free (kpage);
-          #else
-          palloc_free_page (kpage);
-          #endif
           return false; 
         }
 
@@ -631,11 +625,10 @@ setup_stack (const char *cmd_line, void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  #ifdef VM
+  /// PROJECT 3 ///
+  /* Get user memory page */
   kpage = frame_allocate(PAL_USER | PAL_ZERO);
-  #else
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  #endif
+
   if (kpage != NULL) 
     {
       uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
@@ -643,11 +636,7 @@ setup_stack (const char *cmd_line, void **esp)
         success = init_cmd_line (kpage, upage, cmd_line, esp);
       else
       {
-        #ifdef VM
         frame_free(kpage);
-        #else
-        palloc_free_page (kpage);
-        #endif
       }
     }
   return success;

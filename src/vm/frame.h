@@ -1,12 +1,12 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 
-/*Might need more includes !!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 #include <list.h>
 #include "threads/palloc.h"
 #include "vm/page.h"
 
-//Function definitions for includes
+/* PROJECT 3 */
+
 struct suppl_pt *suppl_pt_create (void);
 void suppl_pt_destroy (struct suppl_pt *);
 
@@ -16,10 +16,10 @@ bool suppl_pt_set_file (void *upage, struct file *, off_t, uint32_t read_bytes,
 bool suppl_pt_load_page (void *upage);
 void suppl_pt_clear_page (void *upage);
 
-/*Frame table entry. The framme table is going to be a list*/
+/*Frame table entry. The frame table is going to be a list*/
 struct frame
 {
-    void *page; //Pointer to page. Every entry in frame table points to the page ("kernel page maps to frame", is what HangPark says)
+    void * page; 				/* Physical address of kernel page. */
     struct list_elem elem;      /* Structured as a list */
 };
 

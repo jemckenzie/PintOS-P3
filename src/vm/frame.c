@@ -1,4 +1,3 @@
-/* Might not need all and might need more*/
 #include "vm/frame.h"
 #include <bitmap.h>
 #include <debug.h>
@@ -28,32 +27,38 @@ ftable_init(void)
 void *
 frame_allocate(enum palloc_flags flags)
 {
+    /* Check if PAL_USER is set */
     ASSERT(flags & PAL_USER);
 
     lock_acquire(&ftable_lock);
 
     //Allocate the page, passing in the flags, of which PAL_USER should be set.
     void *kpage = palloc_get_page(flags);
+
     //If we get back a null page, release lock and return.
     if(kpage == NULL)
     {
         lock_release(&ftable_lock);
         return NULL;
     }
+
     //Allocate some memory for the frame struct.
     struct frame *f = malloc(sizeof(struct frame));
+
     if(f == NULL)
     {
         //If our allocation goes bad, 
         palloc_free_page(kpage);
         return NULL;
     }
+
     //Associate the frame with the page we allocated earlier.
     f->page = kpage;
     //Put in the frame table.
     list_push_back(&ftable, &f->elem);
     //Unlock
     lock_release(&ftable_lock);
+
     return kpage;
 }
 
