@@ -1,35 +1,34 @@
 #include "vm/page.h"
+#include "vm/frame.h"
 #include <list.h>
 #include <string.h>
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
-#include "vm/frame.h"
-#include "vm/frame.h"
 
 
 /* Function that creates a supplemental page table for a process */
-struct supplemental_pagetable * supp_pt_create(void)
+struct supplemental_pt * new_supplemental_table(void)
 {
     //Allocate some mem
-    struct supplemental_pagetable *supp_pt = malloc(sizeof(struct supplemental_pagetable));
+    struct supplemental_pt * supp_pt = malloc(sizeof(struct supplemental_pt));
     if(supp_pt == NULL)
     {
         return NULL;
     }
-    list_init(&supp_pt->list);
+    list_init(&supp_pt->page_list);
 
     return supp_pt;
 }
 
 /* Destroys given supplemental page table.  Frees supp pt entries, not frames. */
-void supp_pt_destroy(struct supplemental_pagetable *spt)
+void supp_pt_destroy(struct supplemental_pt *spt)
 {
     struct list_elem *e;
-    if(!list_empty(&spt->list))
+    if(!list_empty(&spt->page_list))
     {
-        for(e = list_begin(&spt->list); e != list_end(&spt->list); e = list_next(e))
+        for(e = list_begin(&spt->page_list); e != list_end(&spt->page_list); e = list_next(e))
         {
             struct spt_entry *spte = list_entry(e, struct spt_entry, elem);
             free_entry(spte);
@@ -41,10 +40,10 @@ void supp_pt_destroy(struct supplemental_pagetable *spt)
 /* Locates a user page entry in the supplemental page table. */
 struct spt_entry * locate_page(void *user_page)
 {
-    struct supplemental_pagetable *table = thread_current()->spt;
+    struct supplemental_pt *table = thread_current()->spt;
     struct list_elem *e;
 
-    for(e = list_begin(&table->list); e != list_end(&table->list); e = list_next(e))
+    for(e = list_begin(&table->page_list); e != list_end(&table->page_list); e = list_next(e))
     {
         struct spt_entry *entry = list_entry(e, struct spt_entry, elem);
         //Located the 
@@ -88,7 +87,7 @@ bool suppl_pt_zero_allocate(void *user_page)
     spte->kernel_page = NULL;
     spte->dirty = false;  //It was just allocated so it hasn't been dirtied by a write yet.
 
-    struct supplemental_pagetable *pt = thread_current()->spt;
+    struct supplemental_pt *pt = thread_current()->spt;
     //Add the new entry to the thread's supplemental page table.
     list_push_back(&pt->list, &spte->elem);
     return true;
@@ -114,8 +113,8 @@ uint32_t read_bytes, uint32_t zero_bytes, bool writable)
     spte->writable = writable;
 
     //Add the new file entry to the supplemental page table.
-    struct supplemental_pagetable *pt = thread_current()->spt;
-    list_push_back(&pt->list, &spte->elem);
+    struct supplemental_pt *pt = thread_current()->spt;
+    list_push_back(&pt->page_list, &spte->elem);
     return true;
 }
 

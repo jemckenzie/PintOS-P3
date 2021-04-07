@@ -1,10 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
-#ifdef VM
-#include "vm/page.h"
-#endif
-
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -104,8 +100,9 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    //PROJECT 3
-    struct supplemental_pagetable *spt;                         /* Page table associated with this thread. */
+
+    ///PROJECT 3///
+    struct supplemental_pt * spt;       /* Supplemental page table. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

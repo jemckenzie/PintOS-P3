@@ -316,6 +316,11 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  /* Set up supplemental page table */
+  t->spt = new_supplemental_table();
+  if(t->spt == NULL)
+    goto fail;
+
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
     cmd_line++;
@@ -502,7 +507,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /// PROJECT 3 ///
 
       /* Get a page of memory. */
-      uint8_t *kpage = frame_allocate(PAL_USER)
+      uint8_t *kpage = frame_allocate(PAL_USER);
 
       if (kpage == NULL)
         return false;

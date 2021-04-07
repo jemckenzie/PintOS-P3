@@ -13,9 +13,9 @@ enum page_status
 };
 
 /*  Supplemental page table */
-struct supplemental_pagetable
+struct supplemental_pt
 {
-    struct list list;   /* List of pages */
+    struct list page_list;   /* List of pages */
 };
 
 
