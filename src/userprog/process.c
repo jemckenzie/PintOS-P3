@@ -319,7 +319,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   /* Set up supplemental page table */
   t->spt = new_supplemental_table();
   if(t->spt == NULL)
-    goto fail;
+    goto done;
 
   /* Extract file_name from command line. */
   while (*cmd_line == ' ')
@@ -505,11 +505,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /// PROJECT 3 ///
+      #ifdef VM
+        if (!suppl_pt_set_file (upage, file, ofs, page_read_bytes,
+                                page_zero_bytes, writable, false))
+          return false;
+      #endif
 
-      /* Get a page of memory. */
-      uint8_t *kpage = frame_allocate(PAL_USER);
 
-      if (kpage == NULL)
+      uint8_t kpage = frame_allocate(PAL_USER);
+      if(kpage == NULL)
         return false;
 
       /* Load this page. */
@@ -632,17 +636,30 @@ setup_stack (const char *cmd_line, void **esp)
 
   /// PROJECT 3 ///
   /* Get user memory page */
-  kpage = frame_allocate(PAL_USER | PAL_ZERO);
+  #ifdef VM
+    kpage = frame_allocate(PAL_USER | PAL_ZERO);
 
+    if (kpage != NULL) 
+      {
+        uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+        if (install_page (upage, kpage, true))
+          success = init_cmd_line (kpage, upage, cmd_line, esp);
+        else
+        {
+          frame_free(kpage);
+        }
+      }
+    return success;
+  #endif
+
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       if (install_page (upage, kpage, true))
         success = init_cmd_line (kpage, upage, cmd_line, esp);
       else
-      {
-        frame_free(kpage);
-      }
+        palloc_free_page (kpage);
     }
   return success;
 }

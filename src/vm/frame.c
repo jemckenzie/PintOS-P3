@@ -24,11 +24,12 @@ ftable_init(void)
 }
 
 /*Allocates the frame table entry setting its address ....*/
-void *
+struct frame *
 frame_allocate(enum palloc_flags flags)
 {
     /* Check if PAL_USER is set */
     ASSERT(flags & PAL_USER);
+    ASSERT(spt_entry != NULL);
 
     lock_acquire(&ftable_lock);
 
@@ -49,6 +50,7 @@ frame_allocate(enum palloc_flags flags)
     {
         //If our allocation goes bad, 
         palloc_free_page(kpage);
+        lock_release(&ftable_lock);
         return NULL;
     }
 
@@ -59,7 +61,7 @@ frame_allocate(enum palloc_flags flags)
     //Unlock
     lock_release(&ftable_lock);
 
-    return kpage;
+    return f;
 }
 
 /*frees the frame*/
@@ -114,4 +116,31 @@ void frame_remove(struct frame *f)
         free(f);
     }
     lock_release(&ftable_lock);
+}
+
+
+static void
+frame_remove(void * kpage)
+{
+    //search for the frame
+        lock_acquire(&ftable_lock);
+        struct frame *f = NULL;
+        struct list_elem e;
+
+        for(e = list_begin(&ftable); e != list_end(&ftable); e = list_next(e))
+        {
+            struct frame *ftemp = list_entry(e, struct frame, elem);
+            if(ftemp->kpage == spte->kpage)
+            {
+                f = ftemp;
+                break;
+            }
+        }
+        //remove frame if it is NULL
+        if(f != NULL)
+        {
+            list_remove(f);
+            free(f);
+        }
+        lock_release(&ftable_lock);
 }

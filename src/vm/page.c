@@ -58,8 +58,6 @@ struct spt_entry * locate_page(void *user_page)
 /* Frees an individual supplemental page table entry.  Needs implementation for swapping. */
 void free_entry(struct spt_entry *spte)
 {
-    if(spte == NULL)
-    return;
 
     if(spte->kernel_page != NULL)
     {
@@ -89,7 +87,7 @@ bool suppl_pt_zero_allocate(void *user_page)
 
     struct supplemental_pt *pt = thread_current()->spt;
     //Add the new entry to the thread's supplemental page table.
-    list_push_back(&pt->list, &spte->elem);
+    list_push_back(&pt->page_list, &spte->elem);
     return true;
 }
 
@@ -190,6 +188,6 @@ void clear_page_from_table(void *user_page)
 {
     //Find the page.
     struct spt_entry *entry = locate_page(user_page);
-    pagedir_clear_page(thread_current()->pagedir, user_page)
+    pagedir_clear_page(thread_current()->pagedir, user_page);
     free_entry(entry);
 }

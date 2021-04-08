@@ -1,9 +1,13 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include <debug.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/syscall.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -148,22 +152,33 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* Handle bad dereferences from system call implementation. */
-  if (!user)
-  {
-    f->eip = (void (*) (void)) f->eax;
-    f->eax = 0;
-    return;
-  }
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  //PROJECT 3//
+  /*In project 3, a page fault no longer indicates a a bug in the kernel or user program. Now, a page fault might only 
+  indicate that the page must be brought in from a file or swap. Now, a page fault might only indicate that the page 
+  must be brought in from a file or swap.*/
+  #ifdef VM
+   void *user_page = pg_round_down(fault_addr); //rounds down to neares page boundary for the user virtual page
+   //check to see if we can add a new supplemental page table entry to zero-fill with the user_page, the user virtual page
+   if(!suppl_pt_set_zero_allocate(user_page))
+   {
+      goto fail;
+   }
+   //otherwise we can load the page
+   if(load_page(user_page))
+      return;
+   fail:   
+  #endif 
+
+   /* Handle bad dereferences from system call implementation. */
+   if (!user)
+   {
+      f->eip = (void (*) (void)) f->eax;
+      f->eax = (uint32_t) -1; //PROJECT 3: set EAX to -1 as failure code.... it used to be 0
+      return;
+   }
+   /*Terminate process*/
+   sys_exit(-1);
+   NOT_REACHED();
 }
 

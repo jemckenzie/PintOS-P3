@@ -37,4 +37,11 @@ struct spt_entry
     struct list_elem elem;         /* Element within the list(the supplemental page table itself) */
 };
 
+void supp_pt_destroy(struct supplemental_pt *);
+struct spt_entry * locate_page(void *);
+void free_entry(struct spt_entry*);
+bool suppl_pt_zero_allocate(void *);
+bool suppl_pt_file_allocate(void *, struct file *, off_t, uint32_t, uint32_t, bool);
+bool load_page(void *);
+void clear_page_from_table(void *);
 #endif
