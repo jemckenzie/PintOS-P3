@@ -157,7 +157,6 @@ page_fault (struct intr_frame *f)
   /*In project 3, a page fault no longer indicates a a bug in the kernel or user program. Now, a page fault might only 
   indicate that the page must be brought in from a file or swap. Now, a page fault might only indicate that the page 
   must be brought in from a file or swap.*/
-  #ifdef VM
    void *user_page = pg_round_down(fault_addr); //rounds down to neares page boundary for the user virtual page
    //check to see if we can add a new supplemental page table entry to zero-fill with the user_page, the user virtual page
    if(!suppl_pt_set_zero_allocate(user_page))
@@ -168,7 +167,6 @@ page_fault (struct intr_frame *f)
    if(load_page(user_page))
       return;
    fail:   
-  #endif 
 
    /* Handle bad dereferences from system call implementation. */
    if (!user)

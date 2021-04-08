@@ -3,6 +3,7 @@
 
 #include <list.h>
 #include "filesys/file.h"
+#include "frame.h"
 
 /* Denotes the status of an individual page */
 enum page_status

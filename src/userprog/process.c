@@ -18,10 +18,9 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-
-#ifdef VM
 #include "vm/frame.h"
-#endif
+#include "vm/page.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmd_line, void (**eip) (void), void **esp);
@@ -505,11 +504,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /// PROJECT 3 ///
-      #ifdef VM
         if (!suppl_pt_set_file (upage, file, ofs, page_read_bytes,
                                 page_zero_bytes, writable, false))
           return false;
-      #endif
 
 
       uint8_t kpage = frame_allocate(PAL_USER);
@@ -636,7 +633,6 @@ setup_stack (const char *cmd_line, void **esp)
 
   /// PROJECT 3 ///
   /* Get user memory page */
-  #ifdef VM
     kpage = frame_allocate(PAL_USER | PAL_ZERO);
 
     if (kpage != NULL) 
@@ -650,7 +646,6 @@ setup_stack (const char *cmd_line, void **esp)
         }
       }
     return success;
-  #endif
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 

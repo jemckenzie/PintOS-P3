@@ -8,6 +8,7 @@
 #include "vm/page.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "userprog/exception.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
