@@ -1,193 +1,278 @@
 #include "vm/page.h"
-#include "vm/frame.h"
-#include <list.h>
+#include <stdio.h>
 #include <string.h>
+#include "vm/frame.h"
+#include "vm/swap.h"
+#include "filesys/file.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "threads/vaddr.h"
 
+/* Maximum size of process stack, in bytes. */
+#define STACK_MAX (1024 * 1024)
 
-/* Function that creates a supplemental page table for a process */
-struct supplemental_pt * new_supplemental_table(void)
+/* Destroys a page, which must be in the current process's
+   page table.  Used as a callback for hash_destroy(). */
+static void
+destroy_page (struct hash_elem *p_, void *aux UNUSED)
 {
-    //Allocate some mem
-    struct supplemental_pt * supp_pt = malloc(sizeof(struct supplemental_pt));
-    if(supp_pt == NULL)
-    {
-        return NULL;
-    }
-    list_init(&supp_pt->page_list);
-
-    return supp_pt;
+  struct page *p = hash_entry (p_, struct page, hash_elem);
+  frame_lock (p);
+  if (p->frame)
+    frame_free (p->frame);
+  free (p);
 }
 
-/* Destroys given supplemental page table.  Frees supp pt entries, not frames. */
-void supp_pt_destroy(struct supplemental_pt *spt)
+/* Destroys the current process's page table. */
+void
+page_exit (void) 
 {
-    struct list_elem *e;
-    if(!list_empty(&spt->page_list))
-    {
-        for(e = list_begin(&spt->page_list); e != list_end(&spt->page_list); e = list_next(e))
-        {
-            struct spt_entry *spte = list_entry(e, struct spt_entry, elem);
-            free_entry(spte);
-        }
-    }
-    free(spt);
+  struct hash *h = thread_current ()->pages;
+  if (h != NULL)
+    hash_destroy (h, destroy_page);
 }
 
-/* Locates a user page entry in the supplemental page table. */
-struct spt_entry * locate_page(void *user_page)
+/* Returns the page containing the given virtual ADDRESS,
+   or a null pointer if no such page exists.
+   Allocates stack pages as necessary. */
+static struct page *
+page_for_addr (const void *address) 
 {
-    struct supplemental_pt *table = thread_current()->spt;
-    struct list_elem *e;
-
-    for(e = list_begin(&table->page_list); e != list_end(&table->page_list); e = list_next(e))
+  if (address < PHYS_BASE) 
     {
-        struct spt_entry *entry = list_entry(e, struct spt_entry, elem);
-        //Located the 
-        if(entry->user_page == user_page)
-        {
-            return entry;
-        }
+      struct page p;
+      struct hash_elem *e;
+
+      /* Find existing page. */
+      p.addr = (void *) pg_round_down (address);
+      e = hash_find (thread_current ()->pages, &p.hash_elem);
+      if (e != NULL)
+        return hash_entry (e, struct page, hash_elem);
+
+      /* No page.  Expand stack? */
+
+/* add code */
+
     }
-    return NULL;
+  return NULL;
 }
 
-/* Frees an individual supplemental page table entry.  Needs implementation for swapping. */
-void free_entry(struct spt_entry *spte)
+/* Locks a frame for page P and pages it in.
+   Returns true if successful, false on failure. */
+static bool
+do_page_in (struct page *p)
 {
-
-    if(spte->kernel_page != NULL)
-    {
-        frame_remove(spte->kernel_page);
-    }
-    else if(spte->pagetype == PAGE_SWAP)
-    {
-        //GOTTA FILL THIS IN STILL
-    }
-    list_remove(&spte->elem);
-    free(spte);
-}
-
-/* Zeroed supplemental page table entry is allocated with passed in user page address */
-bool suppl_pt_zero_allocate(void *user_page)
-{
-    struct spt_entry *spte = malloc(sizeof(struct spt_entry));
-    if(spte == NULL)
-    {
-        return false;
-    }
-
-    spte->pagetype = PAGE_ZERO;
-    spte->user_page = user_page;
-    spte->kernel_page = NULL;
-    spte->dirty = false;  //It was just allocated so it hasn't been dirtied by a write yet.
-
-    struct supplemental_pt *pt = thread_current()->spt;
-    //Add the new entry to the thread's supplemental page table.
-    list_push_back(&pt->page_list, &spte->elem);
-    return true;
-}
-
-/* Allocates a page for a given user page with the file parameters passed in. */
-bool suppl_pt_file_allocate(void *user_page, struct file *file, off_t offset,
-uint32_t read_bytes, uint32_t zero_bytes, bool writable)
-{
-    struct spt_entry *spte = malloc(sizeof(struct spt_entry));
-    if(spte == NULL)
+  /* Get a frame for the page. */
+  p->frame = frame_alloc_and_lock (p);
+  if (p->frame == NULL)
     return false;
 
-    //It's a file page.
-    spte->pagetype = PAGE_FILE;
-    spte->user_page = user_page;
-    spte->kernel_page = NULL;
-    spte->dirty = false;
-    spte->file = file;
-    spte->file_offset = offset;
-    spte->read_bytes = read_bytes;
-    spte->zero_bytes = zero_bytes;
-    spte->writable = writable;
+  /* Copy data into the frame. */
+  if (p->sector != (block_sector_t) -1) 
+    {
+      /* Get data from swap. */
+      swap_in (p); 
+    }
+  else if (p->file != NULL) 
+    {
+      /* Get data from file. */
+      off_t read_bytes = file_read_at (p->file, p->frame->base,
+                                        p->file_bytes, p->file_offset);
+      off_t zero_bytes = PGSIZE - read_bytes;
+      memset (p->frame->base + read_bytes, 0, zero_bytes);
+      if (read_bytes != p->file_bytes)
+        printf ("bytes read (%"PROTd") != bytes requested (%"PROTd")\n",
+                read_bytes, p->file_bytes);
+    }
+  else 
+    {
+      /* Provide all-zero page. */
+      memset (p->frame->base, 0, PGSIZE);
+    }
 
-    //Add the new file entry to the supplemental page table.
-    struct supplemental_pt *pt = thread_current()->spt;
-    list_push_back(&pt->page_list, &spte->elem);
-    return true;
+  return true;
 }
 
-/* Loads a user page into a frame in physical memory. */
-bool load_page(void *user_page)
+/* Faults in the page containing FAULT_ADDR.
+   Returns true if successful, false on failure. */
+bool
+page_in (void *fault_addr) 
 {
-    //Use the helper function to find the entry in the table.
-    struct spt_entry *entry = locate_page(user_page);
-    if(entry == NULL)
-    {
-        return false;
-    }
-    if(entry->kernel_page != NULL)
-    {
-        return false;
-    }
+  struct page *p;
+  bool success;
 
-    //Allocate a frame using the function we defined in frame.  Uses palloc_get_page with the USER_PAL flag set to grab from the user pool.
-    void *kernel_page = frame_allocate(PAL_USER);
-    //Error check
-    if(kernel_page == NULL)
+  /* Can't handle page faults without a hash table. */
+  if (thread_current ()->pages == NULL) 
+    return false;
+
+  p = page_for_addr (fault_addr);
+  if (p == NULL) 
+    return false; 
+
+  frame_lock (p);
+  if (p->frame == NULL)
+    {
+      if (!do_page_in (p))
         return false;
+    }
+  ASSERT (lock_held_by_current_thread (&p->frame->lock));
     
-    bool writable = true;
-    switch(entry->pagetype)
+  /* Install frame into page table. */
+  success = pagedir_set_page (thread_current ()->pagedir, p->addr,
+                              p->frame->base, !p->read_only);
+
+  /* Release frame. */
+  frame_unlock (p->frame);
+
+  return success;
+}
+
+/* Evicts page P.
+   P must have a locked frame.
+   Return true if successful, false on failure. */
+bool
+page_out (struct page *p) 
+{
+  bool dirty;
+  bool ok = false;
+
+  ASSERT (p->frame != NULL);
+  ASSERT (lock_held_by_current_thread (&p->frame->lock));
+
+  /* Mark page not present in page table, forcing accesses by the
+     process to fault.  This must happen before checking the
+     dirty bit, to prevent a race with the process dirtying the
+     page. */
+
+/* add code here */
+
+  /* Has the frame been modified? */
+
+/* add code here */
+
+  /* Write frame contents to disk if necessary. */
+
+/* add code here */
+
+  return ok;
+}
+
+/* Returns true if page P's data has been accessed recently,
+   false otherwise.
+   P must have a frame locked into memory. */
+bool
+page_accessed_recently (struct page *p) 
+{
+  bool was_accessed;
+
+  ASSERT (p->frame != NULL);
+  ASSERT (lock_held_by_current_thread (&p->frame->lock));
+
+  was_accessed = pagedir_is_accessed (p->thread->pagedir, p->addr);
+  if (was_accessed)
+    pagedir_set_accessed (p->thread->pagedir, p->addr, false);
+  return was_accessed;
+}
+
+/* Adds a mapping for user virtual address VADDR to the page hash
+   table.  Fails if VADDR is already mapped or if memory
+   allocation fails. */
+struct page *
+page_allocate (void *vaddr, bool read_only)
+{
+  struct thread *t = thread_current ();
+  struct page *p = malloc (sizeof *p);
+  if (p != NULL) 
     {
-        case PAGE_ZERO:
-        //Set it to all zeroes in memory for a zeroed page.
-            memset(kernel_page, 0, PGSIZE);
-            break;
+      p->addr = pg_round_down (vaddr);
 
-        case PAGE_FILE:
-            //Find the position in the file.
-            file_seek(entry->file, entry->file_offset);
-            //If we have an unequal amount of read bytes in page table entry to the file_read operation
-            if(file_read(entry->file, kernel_page, entry->file_offset) != (int) entry->read_bytes)
-            {
-                //Free the frame and get out because something's wrong.
-                frame_free(kernel_page);
-                return false;
-            }
-            //Set up in memory some zeroes at the position of the file's offset with a value of the zero bytes field.
-            memset(kernel_page + entry->read_bytes, 0, entry->zero_bytes);
-            writable = entry->writable;
-            break;
+      p->read_only = read_only;
+      p->private = !read_only;
 
-        case PAGE_SWAP:
-        //Not yet implemented
-            break;
+      p->frame = NULL;
 
-        default:
-        //Panic the kernel.
-            NOT_REACHED();
+      p->sector = (block_sector_t) -1;
+
+      p->file = NULL;
+      p->file_offset = 0;
+      p->file_bytes = 0;
+
+      p->thread = thread_current ();
+
+      if (hash_insert (t->pages, &p->hash_elem) != NULL) 
+        {
+          /* Already mapped. */
+          free (p);
+          p = NULL;
+        }
     }
+  return p;
+}
 
-    uint32_t *pd = thread_current()->pagedir;
-    //Check and see if we can set the user page to map to a frame in physical memory.
-    //Error check
-    if(!pagedir_set_page(pd, user_page, kernel_page, writable))
+/* Evicts the page containing address VADDR
+   and removes it from the page table. */
+void
+page_deallocate (void *vaddr) 
+{
+  struct page *p = page_for_addr (vaddr);
+  ASSERT (p != NULL);
+  frame_lock (p);
+  if (p->frame)
     {
-        frame_free(kernel_page);
-        return false;
+      struct frame *f = p->frame;
+      if (p->file && !p->private) 
+        page_out (p); 
+      frame_free (f);
     }
-    //Set the pte's kernel page field to the one we allocated from the user page pool.
-    entry->kernel_page = kernel_page;
+  hash_delete (thread_current ()->pages, &p->hash_elem);
+  free (p);
+}
 
+/* Returns a hash value for the page that E refers to. */
+unsigned
+page_hash (const struct hash_elem *e, void *aux UNUSED) 
+{
+  const struct page *p = hash_entry (e, struct page, hash_elem);
+  return ((uintptr_t) p->addr) >> PGBITS;
+}
+
+/* Returns true if page A precedes page B. */
+bool
+page_less (const struct hash_elem *a_, const struct hash_elem *b_,
+           void *aux UNUSED) 
+{
+  const struct page *a = hash_entry (a_, struct page, hash_elem);
+  const struct page *b = hash_entry (b_, struct page, hash_elem);
+  
+  return a->addr < b->addr;
+}
+
+/* Tries to lock the page containing ADDR into physical memory.
+   If WILL_WRITE is true, the page must be writeable;
+   otherwise it may be read-only.
+   Returns true if successful, false on failure. */
+bool
+page_lock (const void *addr, bool will_write) 
+{
+  struct page *p = page_for_addr (addr);
+  if (p == NULL || (p->read_only && will_write))
+    return false;
+  
+  frame_lock (p);
+  if (p->frame == NULL)
+    return (do_page_in (p)
+            && pagedir_set_page (thread_current ()->pagedir, p->addr,
+                                 p->frame->base, !p->read_only)); 
+  else
     return true;
 }
 
-/* Clears the entry from the supplemental page table of the current thread.  Removes the table element, but doesn't free the frame.
-Will cause the passed in user_page to page fault. */
-void clear_page_from_table(void *user_page)
+/* Unlocks a page locked with page_lock(). */
+void
+page_unlock (const void *addr) 
 {
-    //Find the page.
-    struct spt_entry *entry = locate_page(user_page);
-    pagedir_clear_page(thread_current()->pagedir, user_page);
-    free_entry(entry);
+  struct page *p = page_for_addr (addr);
+  ASSERT (p != NULL);
+  frame_unlock (p->frame);
 }

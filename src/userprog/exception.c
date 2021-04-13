@@ -1,12 +1,9 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
-#include <debug.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"
-#include "userprog/syscall.h"
 #include "vm/page.h"
 
 /* Number of page faults processed. */
@@ -82,7 +79,7 @@ kill (struct intr_frame *f)
      the kernel.  Real Unix-like operating systems pass most
      exceptions back to the process via signals, but we don't
      implement them. */
-
+     
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
   switch (f->cs)
@@ -152,31 +149,19 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
-  //PROJECT 3//
-  /*In project 3, a page fault no longer indicates a a bug in the kernel or user program. Now, a page fault might only 
-  indicate that the page must be brought in from a file or swap. Now, a page fault might only indicate that the page 
-  must be brought in from a file or swap.*/
-   void *user_page = pg_round_down(fault_addr); //rounds down to neares page boundary for the user virtual page
-   //check to see if we can add a new supplemental page table entry to zero-fill with the user_page, the user virtual page
-   if(!suppl_pt_set_zero_allocate(user_page))
-   {
-      goto fail;
-   }
-   //otherwise we can load the page
-   if(load_page(user_page))
+  /* Allow the pager to try to handle it. */
+  if (user && not_present)
+    {
+      if (!page_in (fault_addr))
+        thread_exit ();
       return;
-   fail:   
+    }
 
-   /* Handle bad dereferences from system call implementation. */
-   if (!user)
-   {
-      f->eip = (void (*) (void)) f->eax;
-      f->eax = (uint32_t) -1; //PROJECT 3: set EAX to -1 as failure code.... it used to be 0
-      return;
-   }
-   /*Terminate process*/
-   sys_exit(-1);
-   NOT_REACHED();
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+          fault_addr,
+          not_present ? "not present" : "rights violation",
+          write ? "writing" : "reading",
+          user ? "user" : "kernel");
+  kill (f);
 }
 
